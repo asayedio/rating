@@ -2,107 +2,31 @@
 using Newtonsoft.Json.Converters;
 using System;
 using System.IO;
+/// <summary>
 /// The RatingEngine reads the policy application details from a file and produces a numeric 
 /// rating value based on the details.
 /// </summary>
 public class RatingEngine
 {
+    public ConsoleLogger Logger { get; set; } = new ConsoleLogger();
+    public FilePolicySource PolicySource { get; set; } = new FilePolicySource();
+    public JsonPolicySerializer PolicySerializer { get; set; } = new JsonPolicySerializer();
     public decimal Rating { get; set; }
-    private ConsoleLogger _logger;
-    private FilePolicySource _filePolicy;
-
-    public RatingEngine()
-    {
-        _logger  = new ConsoleLogger();
-        _filePolicy = new FilePolicySource();
-    }
     public void Rate()
     {
-        _logger.Log("Starting rate.");
+        Logger.Log("Starting rate.");
 
-        _logger.Log("Loading policy.");
+        Logger.Log("Loading policy.");
 
-        // load policy - open file policy.json
-        string policyJson = _filePolicy.GetPolicyFromSource();
+        string policyJson = PolicySource.GetPolicyFromSource();
 
-        // deserialize policy file content to policy object
-        var policy = JsonConvert.DeserializeObject<Policy>(policyJson, new StringEnumConverter());
+        var policy = PolicySerializer.GetPolicyFromJsonString(policyJson);
 
-        switch (policy.Type)
-        {
-            case PolicyType.Auto:
-                _logger.Log("Rating AUTO policy...");
-                _logger.Log("Validating policy.");
-                if (String.IsNullOrEmpty(policy.Make))
-                {
-                    _logger.Log("Auto policy must specify Make");
-                    return;
-                }
-                if (policy.Make == "BMW")
-                {
-                    if (policy.Deductible < 500)
-                    {
-                        Rating = 1000m;
-                    }
-                    Rating = 900m;
-                }
-                break;
+        var factory = new RaterFactory();
 
-            case PolicyType.Land:
-                _logger.Log("Rating LAND policy...");
-                _logger.Log("Validating policy.");
-                if (policy.BondAmount == 0 || policy.Valuation == 0)
-                {
-                    _logger.Log("Land policy must specify Bond Amount and Valuation.");
-                    return;
-                }
-                if (policy.BondAmount < 0.8m * policy.Valuation)
-                {
-                    _logger.Log("Insufficient bond amount.");
-                    return;
-                }
-                Rating = policy.BondAmount * 0.05m;
-                break;
+        var rater = factory.Create(policy, this);
+        rater?.Rate(policy);
 
-            case PolicyType.Life:
-                _logger.Log("Rating LIFE policy...");
-                _logger.Log("Validating policy.");
-                if (policy.DateOfBirth == DateTime.MinValue)
-                {
-                    _logger.Log("Life policy must include Date of Birth.");
-                    return;
-                }
-                if (policy.DateOfBirth <DateTime.Today.AddYears(-100))
-                {
-                    _logger.Log("Centenarians are not eligible for coverage.");
-                    return;
-                }
-                if (policy.Amount == 0)
-                {
-                    _logger.Log("Life policy must include an Amount.");
-                    return;
-                }
-                int age = DateTime.Today.Year - policy.DateOfBirth.Year;
-                if (policy.DateOfBirth.Month == DateTime.Today.Month &&
-                    DateTime.Today.Day < policy.DateOfBirth.Day ||
-                    DateTime.Today.Month < policy.DateOfBirth.Month)
-                {
-                    age--;
-                }
-                decimal baseRate = policy.Amount * age / 200;
-                if (policy.IsSmoker)
-                {
-                    Rating = baseRate * 2;
-                    break;
-                }
-                Rating = baseRate;
-                break;
-
-            default:
-                _logger.Log("Unknown policy type");
-                break;
-        }
-
-        _logger.Log("Rating completed.");
+        Logger.Log("Rating completed.");
     }
 }
