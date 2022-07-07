@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Rating;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,7 +15,7 @@ public class RaterFactory
         }
         catch
         {
-            return null;
+            return new UnknownPolicyRater(engine, engine.Logger);
         }
     }
 }
